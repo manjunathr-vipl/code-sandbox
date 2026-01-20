@@ -1,0 +1,38 @@
+name: Deploy Frappe App
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${SERVER_SSH_KEY}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        printf "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+
+    - name: Deploy to server
+      run: |
+        ssh ${SERVER_USER}@${SERVER_HOST} << 'EOF'
+          cd ${BENCH_PATH}
+
+          # update app from git
+          bench get-app --branch main https://github.com/your/repo.git || true
+          cd apps/your_app && git pull origin main && cd ../..
+
+          # install deps + build + migrate
+          bench setup requirements
+          bench build
+          bench migrate
+
+          # restart processes
+          bench restart
+        EOF
